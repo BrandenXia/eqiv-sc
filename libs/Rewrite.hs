@@ -1,11 +1,11 @@
 {-# LANGUAGE RecordWildCards #-}
 
-module Rewrite (Pattern, RwRule, matchPattern) where
+module Rewrite (Pattern, RwRule) where
 
 import Base
 import Control.Monad
 import Control.Monad.ST
-import qualified Data.HashTable.ST.Basic as HashTable
+import qualified Data.HashTable.Class as H
 import Egraph
 import Utils (findMaybeM)
 
@@ -25,7 +25,7 @@ matchPattern :: EGraph s -> Pattern -> EClassId -> ST s (Maybe [(Symbol, EClassI
 matchPattern eg@(EGraph {..}) pattern cid = case pattern of
   PVar v -> return $ Just [(v, cid)]
   _ -> do
-    nodes <- HashTable.lookup classes cid
+    nodes <- H.lookup classes cid
     case nodes of
       Nothing -> return Nothing
       Just ns ->

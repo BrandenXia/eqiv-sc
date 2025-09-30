@@ -6,12 +6,15 @@ module Egraph (EClassId, ENode (..), EGraph (..), createEGraph, addENode, unionE
 import Base
 import Control.Monad (when)
 import Control.Monad.ST
-import qualified Data.HashTable.ST.Basic as HashTable
+import qualified Data.HashTable.Class as H
+import qualified Data.HashTable.ST.Basic as BSTH
 import Data.Hashable (Hashable)
 import qualified Data.Vector.Unboxed.Mutable as MVU
 import GHC.Generics (Generic)
 
 type EClassId = Int
+
+type HashTable s k v = BSTH.HashTable s k v
 
 data UnionFind s = UnionFind
   { parents :: MVU.STVector s EClassId,
@@ -73,15 +76,15 @@ data ENode
 instance Hashable ENode
 
 data EGraph s = EGraph
-  { classes :: HashTable.HashTable s EClassId [ENode],
-    memo :: HashTable.HashTable s ENode EClassId,
+  { classes :: HashTable s EClassId [ENode],
+    memo :: HashTable s ENode EClassId,
     uf :: UnionFind s
   }
 
 createEGraph :: ST s (EGraph s)
 createEGraph = do
-  cls <- HashTable.new
-  m <- HashTable.new
+  cls <- H.new
+  m <- H.new
   u <- createUF
   return $ EGraph cls m u
 
@@ -91,22 +94,22 @@ addENode EGraph {..} node =
     OpNode op args -> do
       args' <- mapM (uf_find uf) args
       let node' = OpNode op args'
-      cid <- HashTable.lookup memo node'
+      cid <- H.lookup memo node'
       case cid of
         Just c -> return c
         Nothing -> do
           newId <- uf_add uf
-          HashTable.insert memo node' newId
-          HashTable.insert classes newId [node']
+          H.insert memo node' newId
+          H.insert classes newId [node']
           return newId
     _ -> do
-      cid <- HashTable.lookup memo node
+      cid <- H.lookup memo node
       case cid of
         Just c -> return c
         Nothing -> do
           newId <- uf_add uf
-          HashTable.insert memo node newId
-          HashTable.insert classes newId [node]
+          H.insert memo node newId
+          H.insert classes newId [node]
           return newId
 
 unionENodes :: EGraph s -> EClassId -> EClassId -> ST s ()
@@ -115,9 +118,9 @@ unionENodes EGraph {..} id1 id2 = do
   root2 <- uf_find uf id2
   when (root1 /= root2) $ do
     root <- uf_union uf root1 root2
-    nodes1 <- HashTable.lookup classes root1
-    nodes2 <- HashTable.lookup classes root2
+    nodes1 <- H.lookup classes root1
+    nodes2 <- H.lookup classes root2
     let mergedNodes = maybe [] id nodes1 ++ maybe [] id nodes2
-    mapM_ (\node -> HashTable.insert memo node root) mergedNodes
-    HashTable.insert classes root mergedNodes
-    HashTable.delete classes (if root == root1 then root2 else root1)
+    mapM_ (\node -> H.insert memo node root) mergedNodes
+    H.insert classes root mergedNodes
+    H.delete classes (if root == root1 then root2 else root1)
