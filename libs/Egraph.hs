@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE RecordWildCards #-}
 
-module Egraph (EClassId, ENode (..), EGraph (..), createEGraph, addENode, unionENodes) where
+module Egraph (EClassId, ENode (..), EGraph (..), createEGraph, addENode, unionENodes, inEGraph) where
 
 import Base
 import Control.Monad (when)
@@ -9,6 +9,7 @@ import Control.Monad.ST
 import qualified Data.HashTable.Class as H
 import qualified Data.HashTable.ST.Basic as BSTH
 import Data.Hashable (Hashable)
+import qualified Data.Set as Set
 import GHC.Generics (Generic)
 import qualified Utils.MVec as MVec
 
@@ -79,7 +80,7 @@ data ENode
 instance Hashable ENode
 
 data EGraph s = EGraph
-  { classes :: HashTable s EClassId [ENode],
+  { classes :: HashTable s EClassId (Set.Set ENode),
     memo :: HashTable s ENode EClassId,
     uf :: UnionFind s
   }
@@ -103,7 +104,7 @@ addENode EGraph {..} node =
         Nothing -> do
           newId <- uf_add uf
           H.insert memo node' newId
-          H.insert classes newId [node']
+          H.insert classes newId (Set.singleton node')
           return newId
     _ -> do
       cid <- H.lookup memo node
@@ -112,7 +113,7 @@ addENode EGraph {..} node =
         Nothing -> do
           newId <- uf_add uf
           H.insert memo node newId
-          H.insert classes newId [node]
+          H.insert classes newId (Set.singleton node)
           return newId
 
 unionENodes :: EGraph s -> EClassId -> EClassId -> ST s ()
@@ -123,7 +124,18 @@ unionENodes EGraph {..} id1 id2 = do
     root <- uf_union uf root1 root2
     nodes1 <- H.lookup classes root1
     nodes2 <- H.lookup classes root2
-    let mergedNodes = maybe [] id nodes1 ++ maybe [] id nodes2
+    let mergedNodes = maybe Set.empty id nodes1 <> maybe Set.empty id nodes2
     mapM_ (\node -> H.insert memo node root) mergedNodes
     H.insert classes root mergedNodes
     H.delete classes (if root == root1 then root2 else root1)
+
+-- Add a new node that is equivalent to an existing EClassId, return eids as (root, new)
+addEquivNode :: EGraph s -> ENode -> EClassId -> ST s (EClassId, EClassId)
+addEquivNode eg node eid = do
+  newEid <- addENode eg node
+  unionENodes eg newEid eid
+  root <- uf_find (uf eg) eid
+  return (root, newEid)
+
+inEGraph :: EGraph s -> ENode -> ST s (Maybe EClassId)
+inEGraph EGraph {..} node = H.lookup memo node
