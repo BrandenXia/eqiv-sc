@@ -1,6 +1,6 @@
 {-# LANGUAGE RecordWildCards #-}
 
-module Rewrite (Pattern, RwRule, rewrite) where
+module Rewrite (Pattern (..), RwRule (..), rewrite) where
 
 import Base
 import Control.Monad

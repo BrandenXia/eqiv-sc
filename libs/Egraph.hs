@@ -9,33 +9,40 @@ import Control.Monad.ST
 import qualified Data.HashTable.Class as H
 import qualified Data.HashTable.ST.Basic as BSTH
 import Data.Hashable (Hashable)
-import qualified Data.Vector.Unboxed.Mutable as MVU
 import GHC.Generics (Generic)
+import qualified Utils.MVec as MVec
 
 type EClassId = Int
 
 type HashTable s k v = BSTH.HashTable s k v
 
 data UnionFind s = UnionFind
-  { parents :: MVU.STVector s EClassId,
-    ranks :: MVU.STVector s Int
+  { parents :: MVec.MVec s EClassId,
+    ranks :: MVec.MVec s Int
   }
 
 createUF :: ST s (UnionFind s)
 createUF = do
-  p <- MVU.new 0
-  r <- MVU.new 0
+  p <- MVec.new 64
+  r <- MVec.new 64
   return $ UnionFind p r
 
 uf_find :: UnionFind s -> EClassId -> ST s EClassId
 uf_find uf@(UnionFind p _) x = do
-  px <- MVU.read p x
+  px <- MVec.read p x
   if px == x
     then return x
     else do
       root <- uf_find uf px
-      MVU.write p x root
+      MVec.write p x root
       return root
+
+uf_find_safe :: UnionFind s -> EClassId -> ST s EClassId
+uf_find_safe uf@(UnionFind p _) x = do
+  len <- MVec.length p
+  if x < 0 || x >= len
+    then error "uf_find_safe: EClassId out of bounds"
+    else uf_find uf x
 
 uf_union :: UnionFind s -> EClassId -> EClassId -> ST s EClassId
 uf_union uf@(UnionFind {..}) x y = do
@@ -44,27 +51,23 @@ uf_union uf@(UnionFind {..}) x y = do
   if (px == py)
     then return px
     else do
-      rx <- MVU.read ranks px
-      ry <- MVU.read ranks py
+      rx <- MVec.read ranks px
+      ry <- MVec.read ranks py
       if rx < ry
         then do
-          MVU.write parents px py
-          MVU.write ranks py (ry + rx)
+          MVec.write parents px py
+          MVec.write ranks py (ry + rx)
           return py
         else do
-          MVU.write parents py px
-          MVU.write ranks px (rx + ry)
+          MVec.write parents py px
+          MVec.write ranks px (rx + ry)
           return px
 
--- TODO: Replace this with a dynamic vector that resizes to 1.5x its size when full with capacity and length tracking
 uf_add :: UnionFind s -> ST s EClassId
 uf_add UnionFind {..} = do
-  let len = MVU.length parents
-  let newId = len
-  p' <- MVU.grow parents 1
-  r' <- MVU.grow ranks 1
-  MVU.write p' newId newId
-  MVU.write r' newId 1
+  newId <- MVec.length parents
+  MVec.pushBack parents newId
+  MVec.pushBack ranks 1
   return newId
 
 data ENode
@@ -92,7 +95,7 @@ addENode :: EGraph s -> ENode -> ST s EClassId
 addENode EGraph {..} node =
   case node of
     OpNode op args -> do
-      args' <- mapM (uf_find uf) args
+      args' <- mapM (uf_find_safe uf) args
       let node' = OpNode op args'
       cid <- H.lookup memo node'
       case cid of

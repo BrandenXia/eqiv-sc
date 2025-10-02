@@ -29,6 +29,7 @@ library
       Egraph
       Rewrite
       Utils
+      Utils.MVec
   other-modules:
       Paths_eqiv_sc
   autogen-modules:
