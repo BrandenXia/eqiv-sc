@@ -28,6 +28,7 @@ library
       Base
       Egraph
       Rewrite
+      Search
       Utils
       Utils.MVec
   other-modules:

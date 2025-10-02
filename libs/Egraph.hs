@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE RecordWildCards #-}
 
-module Egraph (EClassId, ENode (..), EGraph (..), createEGraph, addENode, unionENodes, inEGraph) where
+module Egraph (EClassId, ENode (..), EGraph (..), createEGraph, addENode, unionENodes, inEGraph, addEquivNode) where
 
 import Base
 import Control.Monad (when)
