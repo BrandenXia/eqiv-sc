@@ -1,14 +1,14 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE RecordWildCards #-}
 
-module Egraph (EClassId, ENode (..), EGraph (..), createEGraph, addENode, unionENodes, inEGraph, addEquivNode) where
+module Egraph (EClassId, ENode (..), EGraph (..), createEGraph, addENode, unionENodes, inEGraph, addEquivNode, findEClass, visualizeEGraph) where
 
 import Base
-import Control.Monad (when)
 import Control.Monad.ST
 import qualified Data.HashTable.Class as H
 import qualified Data.HashTable.ST.Basic as BSTH
 import Data.Hashable (Hashable)
+import Data.List (intersperse)
 import qualified Data.Set as Set
 import GHC.Generics (Generic)
 import qualified Utils.MVec as MVec
@@ -116,26 +116,46 @@ addENode EGraph {..} node =
           H.insert classes newId (Set.singleton node)
           return newId
 
-unionENodes :: EGraph s -> EClassId -> EClassId -> ST s ()
+unionENodes :: EGraph s -> EClassId -> EClassId -> ST s EClassId
 unionENodes EGraph {..} id1 id2 = do
   root1 <- uf_find uf id1
   root2 <- uf_find uf id2
-  when (root1 /= root2) $ do
-    root <- uf_union uf root1 root2
-    nodes1 <- H.lookup classes root1
-    nodes2 <- H.lookup classes root2
-    let mergedNodes = maybe Set.empty id nodes1 <> maybe Set.empty id nodes2
-    mapM_ (\node -> H.insert memo node root) mergedNodes
-    H.insert classes root mergedNodes
-    H.delete classes (if root == root1 then root2 else root1)
+  if (root1 == root2)
+    then return root1
+    else do
+      root <- uf_union uf root1 root2
+      nodes1 <- H.lookup classes root1
+      nodes2 <- H.lookup classes root2
+      let mergedNodes = maybe Set.empty id nodes1 <> maybe Set.empty id nodes2
+      mapM_ (\node -> H.insert memo node root) mergedNodes
+      H.insert classes root mergedNodes
+      H.delete classes (if root == root1 then root2 else root1)
+      return root
 
 -- Add a new node that is equivalent to an existing EClassId, return eids as (root, new)
 addEquivNode :: EGraph s -> ENode -> EClassId -> ST s (EClassId, EClassId)
 addEquivNode eg node eid = do
   newEid <- addENode eg node
-  unionENodes eg newEid eid
-  root <- uf_find (uf eg) eid
+  root <- unionENodes eg newEid eid
   return (root, newEid)
 
 inEGraph :: EGraph s -> ENode -> ST s (Maybe EClassId)
 inEGraph EGraph {..} node = H.lookup memo node
+
+findEClass :: EGraph s -> EClassId -> ST s EClassId
+findEClass EGraph {..} eid = uf_find_safe uf eid
+
+visualizeEGraph :: EGraph s -> ST s String
+visualizeEGraph EGraph {..} = do
+  cnodes <- H.toList classes
+  nodesStrs <- mapM showCNode cnodes
+  return $ "EGraph {\n  " ++ concat (intersperse "\n  " nodesStrs) ++ "\n}"
+  where
+    showNode (OpNode op args) = do
+      argsClass <- mapM (uf_find_safe uf) args
+      return $ "OpNode " ++ op ++ " [" ++ concat (intersperse ", " (("C" ++) . show <$> argsClass)) ++ "]"
+    showNode (VarNode v) = return $ "VarNode " ++ v
+    showNode (ConsNode n) = return $ "ConsNode " ++ show n
+    showCNode (cid, nodes) = do
+      snodes <- mapM showNode (Set.toList nodes)
+      return $ "Class" ++ show cid ++ " = {" ++ concat (intersperse ", " snodes) ++ "}"

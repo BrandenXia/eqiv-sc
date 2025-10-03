@@ -15,8 +15,10 @@ saturate eg rules eid = do
   where
     bfs [] _ = return ()
     bfs (x : xs) visited = do
-      rws' <- mapM (flip (rewrite eg) x) rules
-      let rws = catMaybes rws'
-      mapM_ (unionENodes eg x) rws
-      bfs (filter (flip Set.member visited) xs ++ rws) (Set.insert x visited)
+      root <- findEClass eg x
+      rws <- mapM (flip (rewrite eg) root) rules
+      let rws' = catMaybes rws
+      mapM_ (unionENodes eg root) rws'
+      let queue = xs ++ filter (not . flip Set.member visited) rws'
+      bfs queue (Set.insert x visited)
       return ()
