@@ -74,7 +74,7 @@ uf_add UnionFind {..} = do
 data ENode
   = OpNode Op [EClassId]
   | VarNode Symbol
-  | ConsNode Int
+  | ConsNode Primitive
   deriving (Eq, Ord, Show, Generic)
 
 instance Hashable ENode
