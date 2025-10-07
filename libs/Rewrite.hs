@@ -12,7 +12,7 @@ import Utils (findMaybeM)
 data Pattern
   = POp Op [Pattern]
   | PVar Symbol
-  | PCons Int
+  | PCons Primitive
   deriving (Eq, Ord, Show)
 
 data RwRule = RwRule
