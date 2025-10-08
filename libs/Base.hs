@@ -11,8 +11,6 @@ type Symbol = String
 
 data Primitive
   = PrimInt Int
-  | PrimBool Bool
-  | PrimString String
   deriving (Eq, Ord, Show, Generic)
 
 instance Hashable Primitive
