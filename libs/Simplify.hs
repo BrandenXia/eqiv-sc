@@ -1,11 +1,16 @@
 {-# LANGUAGE RecordWildCards #-}
 
-module Rewrite (Pattern (..), RwRule (..), rewrite) where
+module Simplify (Pattern (..), RwRule (..), rewrite, compute) where
 
 import Base
 import Control.Monad
 import Control.Monad.ST
+import Control.Monad.Trans.Class
+import Control.Monad.Trans.Maybe
+import Data.Foldable (Foldable (toList))
+import Data.Functor
 import qualified Data.HashTable.Class as H
+import Data.Maybe (catMaybes, listToMaybe)
 import Egraph
 import Utils (findMaybeM)
 
@@ -67,3 +72,42 @@ rewrite eg (RwRule lhs rhs) eid = do
     Just subs -> do
       rhsId <- instantiatePattern eg rhs subs
       return $ Just rhsId
+
+builtinOps :: [(Op, Int, [Primitive] -> Maybe Primitive)]
+builtinOps =
+  [ ("+", 2, add),
+    ("*", 2, mul)
+  ]
+  where
+    add [PrimInt x, PrimInt y] = Just $ PrimInt (x + y)
+    add _ = Nothing
+
+    mul [PrimInt x, PrimInt y] = Just $ PrimInt (x * y)
+    mul _ = Nothing
+
+builtinOpsLookup :: [(Op, (Int, [Primitive] -> Maybe Primitive))]
+builtinOpsLookup = builtinOps <&> \(op, arity, f) -> (op, (arity, f))
+
+compute :: EGraph s -> EClassId -> ST s (Maybe EClassId)
+compute eg@(EGraph {..}) cid = runMaybeT $ do
+  ns <- MaybeT $ H.lookup classes cid
+  prim <- MaybeT $ findMaybeM computeNode ns
+  nid <- lift $ addENode eg (ConsNode prim)
+  _ <- lift $ unionENodes eg cid nid
+  return nid
+  where
+    getConsNode (ConsNode n) = Just n
+    getConsNode _ = Nothing
+    g1 = listToMaybe . catMaybes . map getConsNode . toList
+    computeNode (OpNode op args) =
+      case lookup op builtinOpsLookup
+        <&> \(len, f) ->
+          if length args /= len
+            then pure Nothing
+            else
+              let transform = join . fmap f . traverse g1
+                  evaluatedArgs = sequence <$> mapM (findEClass eg >=> H.lookup classes) args
+               in fmap (>>= transform) evaluatedArgs of
+        Just res -> res
+        Nothing -> return Nothing
+    computeNode _ = return Nothing
