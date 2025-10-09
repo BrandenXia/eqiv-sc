@@ -1,7 +1,19 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE RecordWildCards #-}
 
-module Egraph (EClassId, ENode (..), EGraph (..), createEGraph, addENode, unionENodes, inEGraph, addEquivNode, findEClass, visualizeEGraph) where
+module Egraph
+  ( EClassId,
+    ENode (..),
+    EGraph (..),
+    createEGraph,
+    addENode,
+    unionENodes,
+    inEGraph,
+    addEquivNode,
+    findEClass,
+    visualizeEGraph,
+  )
+where
 
 import Base
 import Control.Monad.ST
