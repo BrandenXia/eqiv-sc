@@ -1,10 +1,12 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Parser (pExpr) where
+module Parser (pAst) where
 
 import Base
-import Data.Char
+import Control.Monad.Combinators.Expr
+import Data.Functor
 import Data.Text (Text)
+import qualified Data.Text as T
 import Data.Void
 import Text.Megaparsec
 import Text.Megaparsec.Char
@@ -38,28 +40,56 @@ pVarExpr =
             <$> (letterChar <|> char '_') -- must start with a letter or underscore
             <*> many (alphaNumChar <|> char '_') -- can contain letters, digits, or underscores
         )
+    <?> "variable"
 
 pConsExpr :: Parser Expr
 pConsExpr = ConsExpr . PrimNum . toRational <$> L.signed space L.scientific
 
-betweenParens :: Parser a -> Parser a
-betweenParens = between (char '(' >> sc) (char ')' >> sc)
+parens :: Parser a -> Parser a
+parens = between (char '(' >> sc) (char ')' >> sc)
 
-pOpExpr :: Parser Expr
-pOpExpr = lexeme $ choice [pBinary]
-  where
-    opChar = satisfy (\c -> not (isSpace c) && not (isAlphaNum c) && c /= '(' && c /= ')' && c /= '#')
-    pBinary = do
-      lhs <- pExpr
-      _ <- space
-      op <- some opChar
-      rhs <- pExpr
-      return $ OpExpr op [lhs, rhs]
-    pNonBinary = do
-      op <- some opChar
-      _ <- space
-      args <- lexeme $ betweenParens (sepBy pExpr $ char ',' >> sc)
-      return $ OpExpr op args
+pTerm :: Parser Expr
+pTerm = lexeme $ choice [parens pExpr, pVarExpr, pConsExpr]
 
 pExpr :: Parser Expr
-pExpr = choice [pOpExpr, pConsExpr, pVarExpr]
+pExpr = makeExprParser pTerm opTable
+
+opTable :: [[Operator Parser Expr]]
+opTable =
+  [ [postfix "'"],
+    [funcCall],
+    [binary "^"],
+    [binary "*", binary "/"],
+    [binary "+", binary "-"],
+    [binary "==", binary "!=", binary "<", binary "<=", binary ">", binary ">="],
+    [binary ","],
+    [binaryAny]
+  ]
+  where
+    binary' :: Parser Op -> Operator Parser Expr
+    binary' p = InfixL $ do
+      op <- lexeme p
+      return $ \x y -> OpExpr op [x, y]
+
+    binary :: Text -> Operator Parser Expr
+    binary op = binary' (string op $> T.unpack op)
+    binaryChar = satisfy $ flip elem ("!@#$%^&*-=+|:<>?/." :: String)
+    binaryAny = binary' (some binaryChar)
+
+    -- prefix :: Text -> Operator Parser Expr
+    -- prefix op = Prefix $ do
+    --   _ <- lexeme (string op)
+    --   return $ \x -> OpExpr (T.unpack op) [x]
+
+    postfix :: Text -> Operator Parser Expr
+    postfix op = Postfix $ do
+      _ <- lexeme (string op)
+      return $ \x -> OpExpr (T.unpack op) [x]
+
+    funcCall :: Operator Parser Expr
+    funcCall = Postfix $ do
+      args <- parens (pExpr `sepBy` (char ',' >> sc))
+      return $ \f -> OpExpr "call" (f : args)
+
+pAst :: Parser Ast
+pAst = AExpr <$> pExpr <* eof
