@@ -10,7 +10,7 @@ type Op = String
 type Symbol = String
 
 data Primitive
-  = PrimInt Int
+  = PrimNum Rational
   deriving (Eq, Ord, Show, Generic)
 
 instance Hashable Primitive

@@ -73,10 +73,10 @@ builtinOps =
     ("*", 2, mul)
   ]
   where
-    add [PrimInt x, PrimInt y] = Just $ PrimInt (x + y)
+    add [PrimNum x, PrimNum y] = Just $ PrimNum (x + y)
     add _ = Nothing
 
-    mul [PrimInt x, PrimInt y] = Just $ PrimInt (x * y)
+    mul [PrimNum x, PrimNum y] = Just $ PrimNum (x * y)
     mul _ = Nothing
 
 builtinOpsLookup :: [(Op, (Int, [Primitive] -> Maybe Primitive))]

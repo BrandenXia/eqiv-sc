@@ -27,6 +27,7 @@ library
   exposed-modules:
       Base
       Egraph
+      Parser
       Search
       Simplify
       Utils
@@ -43,6 +44,8 @@ library
     , containers >=0.7
     , hashable >=1.5.0.0
     , hashtables >=1.4.2
+    , megaparsec >=9.7.0
+    , text >=2.1.2
     , transformers >=0.6.1.1
     , vector >=0.13.2.0
   default-language: Haskell2010
@@ -62,6 +65,8 @@ executable eqiv-sc-exe
     , eqiv-sc
     , hashable >=1.5.0.0
     , hashtables >=1.4.2
+    , megaparsec >=9.7.0
+    , text >=2.1.2
     , transformers >=0.6.1.1
     , vector >=0.13.2.0
   default-language: Haskell2010
@@ -82,6 +87,8 @@ test-suite eqiv-sc-test
     , eqiv-sc
     , hashable >=1.5.0.0
     , hashtables >=1.4.2
+    , megaparsec >=9.7.0
+    , text >=2.1.2
     , transformers >=0.6.1.1
     , vector >=0.13.2.0
   default-language: Haskell2010
