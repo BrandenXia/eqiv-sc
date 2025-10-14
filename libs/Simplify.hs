@@ -1,6 +1,6 @@
 {-# LANGUAGE RecordWildCards #-}
 
-module Simplify (Pattern (..), RwRule (..), rewrite, compute) where
+module Simplify (Pattern (..), RwRule (..), rewrite, compute, expr2RwRule) where
 
 import Base
 import Control.Monad
@@ -12,6 +12,7 @@ import Data.Functor
 import qualified Data.HashTable.Class as H
 import Data.Maybe (catMaybes, listToMaybe)
 import Egraph
+import Parser
 import Utils (findMaybeM)
 
 data Pattern
@@ -73,10 +74,10 @@ builtinOps =
     ("*", 2, mul)
   ]
   where
-    add [PrimInt x, PrimInt y] = Just $ PrimInt (x + y)
+    add [PrimNum x, PrimNum y] = Just $ PrimNum (x + y)
     add _ = Nothing
 
-    mul [PrimInt x, PrimInt y] = Just $ PrimInt (x * y)
+    mul [PrimNum x, PrimNum y] = Just $ PrimNum (x * y)
     mul _ = Nothing
 
 builtinOpsLookup :: [(Op, (Int, [Primitive] -> Maybe Primitive))]
@@ -105,3 +106,11 @@ compute eg@(EGraph {..}) cid = runMaybeT $ do
         Just res -> res
         Nothing -> return Nothing
     computeNode _ = return Nothing
+
+expr2Pattern :: Expr -> Pattern
+expr2Pattern (OpExpr op args) = POp op $ expr2Pattern <$> args
+expr2Pattern (VarExpr sym) = PVar sym
+expr2Pattern (ConsExpr cons) = PCons cons
+
+expr2RwRule :: Expr -> Expr -> RwRule
+expr2RwRule lhs rhs = RwRule (expr2Pattern lhs) (expr2Pattern rhs)
