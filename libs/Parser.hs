@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Parser (pAst) where
+module Parser (Expr (..), Ast (..), pAst) where
 
 import Base
 import Control.Monad.Combinators.Expr
@@ -22,6 +22,7 @@ data Expr
 
 data Ast
   = AExpr Expr
+  | ARewrite Expr Expr
   deriving (Show, Eq)
 
 sc :: Parser ()
@@ -83,7 +84,7 @@ opTable =
 
     postfix :: Text -> Operator Parser Expr
     postfix op = Postfix $ do
-      _ <- lexeme (string op)
+      void $ lexeme (string op)
       return $ \x -> OpExpr (T.unpack op) [x]
 
     funcCall :: Operator Parser Expr
@@ -91,5 +92,14 @@ opTable =
       args <- parens (pExpr `sepBy` (char ',' >> sc))
       return $ \f -> OpExpr "call" (f : args)
 
+pRewrite :: Parser Ast
+pRewrite = do
+  void $ string "rewrite"
+  void sc
+  lhs <- pExpr
+  void sc
+  rhs <- pExpr
+  return $ ARewrite lhs rhs
+
 pAst :: Parser Ast
-pAst = AExpr <$> pExpr <* eof
+pAst = choice [pRewrite, AExpr <$> pExpr] <* eof
