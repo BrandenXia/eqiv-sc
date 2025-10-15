@@ -26,8 +26,10 @@ source-repository head
 library
   exposed-modules:
       Base
+      Cli
       Egraph
       Parser
+      Repl
       Search
       Simplify
       Utils
@@ -44,7 +46,9 @@ library
     , containers >=0.7
     , hashable >=1.5.0.0
     , hashtables >=1.4.2
+    , haskeline >=0.8.2.1
     , megaparsec >=9.7.0
+    , optparse-applicative >=0.18.1.0
     , parser-combinators >=1.3.0
     , text >=2.1.2
     , transformers >=0.6.1.1
@@ -66,7 +70,9 @@ executable eqiv-sc-exe
     , eqiv-sc
     , hashable >=1.5.0.0
     , hashtables >=1.4.2
+    , haskeline >=0.8.2.1
     , megaparsec >=9.7.0
+    , optparse-applicative >=0.18.1.0
     , parser-combinators >=1.3.0
     , text >=2.1.2
     , transformers >=0.6.1.1
@@ -89,7 +95,9 @@ test-suite eqiv-sc-test
     , eqiv-sc
     , hashable >=1.5.0.0
     , hashtables >=1.4.2
+    , haskeline >=0.8.2.1
     , megaparsec >=9.7.0
+    , optparse-applicative >=0.18.1.0
     , parser-combinators >=1.3.0
     , text >=2.1.2
     , transformers >=0.6.1.1
