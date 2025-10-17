@@ -12,7 +12,6 @@ module Egraph
     addEquivNode,
     findEClass,
     visualizeEGraph,
-    expr2ENode,
   )
 where
 
@@ -24,7 +23,6 @@ import Data.Hashable (Hashable)
 import Data.List (intersperse)
 import qualified Data.Set as Set
 import GHC.Generics (Generic)
-import Parser
 import qualified Utils.MVec as MVec
 
 type EClassId = Int
@@ -173,10 +171,3 @@ visualizeEGraph EGraph {..} = do
     showCNode (cid, nodes) = do
       snodes <- mapM showNode (Set.toList nodes)
       return $ "Class" ++ show cid ++ " = {" ++ concat (intersperse ", " snodes) ++ "}"
-
-expr2ENode :: EGraph s -> Expr -> ST s EClassId
-expr2ENode eg (OpExpr op args) = do
-  argIds <- mapM (expr2ENode eg) args
-  addENode eg (OpNode op argIds)
-expr2ENode eg (VarExpr v) = addENode eg (VarNode v)
-expr2ENode eg (ConsExpr n) = addENode eg (ConsNode n)

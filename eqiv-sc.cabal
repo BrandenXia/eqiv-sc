@@ -30,6 +30,7 @@ library
       Egraph
       Parser
       Repl
+      Runtime
       Search
       Simplify
       Utils

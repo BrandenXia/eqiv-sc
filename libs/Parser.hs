@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Parser (Expr (..), Ast (..), pAst) where
+module Parser (Expr (..), Ast (..), parseAst) where
 
 import Base
 import Control.Monad.Combinators.Expr
@@ -103,3 +103,9 @@ pRewrite = do
 
 pAst :: Parser Ast
 pAst = choice [pRewrite, AExpr <$> pExpr] <* eof
+
+parseAst :: String -> String -> Either String Ast
+parseAst source input =
+  case runParser pAst source (T.pack input) of
+    Left err -> Left $ errorBundlePretty err
+    Right ast -> Right ast
