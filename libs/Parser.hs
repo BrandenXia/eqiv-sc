@@ -18,7 +18,12 @@ data Expr
   = OpExpr Op [Expr]
   | VarExpr Symbol
   | ConsExpr Primitive
-  deriving (Show, Eq)
+  deriving (Eq)
+
+instance Show Expr where
+  show (OpExpr op args) = "(" ++ op ++ " " ++ unwords (map show args) ++ ")"
+  show (VarExpr v) = v
+  show (ConsExpr (PrimNum n)) = show n
 
 data Ast
   = AExpr Expr
@@ -101,10 +106,10 @@ pRewrite = do
   rhs <- pExpr
   return $ ARewrite lhs rhs
 
-pAst :: Parser Ast
-pAst = choice [pRewrite, AExpr <$> pExpr] <* eof
+pAst :: Parser (Maybe Ast)
+pAst = choice [Just <$> pRewrite, Just . AExpr <$> pExpr, sc $> Nothing] <* eof
 
-parseAst :: String -> String -> Either String Ast
+parseAst :: String -> String -> Either String (Maybe Ast)
 parseAst source input =
   case runParser pAst source (T.pack input) of
     Left err -> Left $ errorBundlePretty err

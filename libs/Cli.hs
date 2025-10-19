@@ -1,4 +1,4 @@
-module Cli (runCli, Cmd (..), Cli (..)) where
+module Cli (runCli, Cmd (..), Opts (..), Cli (..)) where
 
 import Options.Applicative
 

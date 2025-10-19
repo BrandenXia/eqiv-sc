@@ -43,12 +43,16 @@ library
       libs
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
   build-depends:
-      base >=4.7 && <5
+      Blammo >=2.1.3.0
+    , base >=4.7 && <5
     , containers >=0.7
+    , exceptions >=0.10.9
     , hashable >=1.5.0.0
     , hashtables >=1.4.2
     , haskeline >=0.8.2.1
     , megaparsec >=9.7.0
+    , monad-logger >=0.3.42
+    , mtl >=2.3.1
     , optparse-applicative >=0.18.1.0
     , parser-combinators >=1.3.0
     , text >=2.1.2
@@ -66,13 +70,17 @@ executable eqiv-sc-exe
       app
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      base >=4.7 && <5
+      Blammo >=2.1.3.0
+    , base >=4.7 && <5
     , containers >=0.7
     , eqiv-sc
+    , exceptions >=0.10.9
     , hashable >=1.5.0.0
     , hashtables >=1.4.2
     , haskeline >=0.8.2.1
     , megaparsec >=9.7.0
+    , monad-logger >=0.3.42
+    , mtl >=2.3.1
     , optparse-applicative >=0.18.1.0
     , parser-combinators >=1.3.0
     , text >=2.1.2
@@ -91,13 +99,17 @@ test-suite eqiv-sc-test
       test
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      base >=4.7 && <5
+      Blammo >=2.1.3.0
+    , base >=4.7 && <5
     , containers >=0.7
     , eqiv-sc
+    , exceptions >=0.10.9
     , hashable >=1.5.0.0
     , hashtables >=1.4.2
     , haskeline >=0.8.2.1
     , megaparsec >=9.7.0
+    , monad-logger >=0.3.42
+    , mtl >=2.3.1
     , optparse-applicative >=0.18.1.0
     , parser-combinators >=1.3.0
     , text >=2.1.2

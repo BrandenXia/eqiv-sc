@@ -1,31 +1,28 @@
 module Repl (repl) where
 
 import Control.Monad (forever, when)
-import Control.Monad.ST (stToIO)
 import Control.Monad.Trans.Class (MonadTrans (lift))
-import Egraph
+import Data.Maybe (fromJust)
 import Parser
 import Runtime
 import System.Console.Haskeline
 
-settings :: Settings IO
+settings :: Settings App
 settings = defaultSettings
 
-loop :: InputT IO ()
+loop :: InputT App ()
 loop = do
-  let liftIO = lift . stToIO
-  env <- liftIO $ createEnv "repl"
   forever $ do
     maybeInput <- getInputLine "> "
     when (maybeInput /= Nothing) $ do
-      Just input <- return maybeInput
-      case parseAst (source env) input of
+      let input = fromJust maybeInput
+      case parseAst "repl" input of
         Left err -> outputStrLn err
-        Right ast -> do
-          liftIO $ runEgraph ast env
-          res <- liftIO $ visualizeEGraph (egraph env)
-          outputStrLn res
+        Right (Just ast) -> do
+          lift $ runExpr ast
+          return ()
+        Right Nothing -> return ()
 
-repl :: IO ()
+repl :: App ()
 repl = do
   runInputT settings $ withInterrupt $ handleInterrupt (return ()) loop

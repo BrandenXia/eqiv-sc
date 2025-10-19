@@ -18,7 +18,12 @@ data Pattern
   = POp Op [Pattern]
   | PVar Symbol
   | PCons Primitive
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord)
+
+instance Show Pattern where
+  show (POp op args) = "(" ++ op ++ " " ++ unwords (map show args) ++ ")"
+  show (PVar v) = v
+  show (PCons (PrimNum n)) = show (fromRational n :: Double)
 
 data RwRule = RwRule
   { lhs :: Pattern,

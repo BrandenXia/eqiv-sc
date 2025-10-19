@@ -1,27 +1,58 @@
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TemplateHaskell #-}
 
-module Runtime (createEnv, runEgraph, Env (..)) where
+module Runtime (createEnv, runExpr, Env (..), App (..), runAppM) where
 
+import Cli
+import Control.Monad (void)
+import Control.Monad.Catch (MonadCatch, MonadMask, MonadThrow)
+import Control.Monad.IO.Class
+import Control.Monad.Logger
+import Control.Monad.Reader
 import Control.Monad.ST
-import Data.STRef
+import Data.IORef
+import qualified Data.Text as T
 import Egraph
+import GHC.IORef (atomicModifyIORef'_)
 import Parser
 import Search
 import Simplify hiding (lhs, rhs)
 
-data Env s = Env
-  { source :: String,
-    egraph :: EGraph s,
-    rulesRef :: STRef s [RwRule]
+type LogFunc = Loc -> LogSource -> LogLevel -> LogStr -> IO ()
+
+data Env = Env
+  { envOpts :: Opts,
+    envEgraph :: EGraph RealWorld,
+    envRules :: IORef [RwRule],
+    envLogger :: LogFunc
   }
 
-type EnvMonad s a = Env s -> ST s a
+newtype App a = App {unApp :: ReaderT Env IO a}
+  deriving newtype (Functor, Applicative, Monad, MonadIO, MonadReader Env)
+  deriving newtype (MonadThrow, MonadCatch, MonadMask)
 
-createEnv :: String -> ST s (Env s)
-createEnv source = do
-  eg <- createEGraph
-  rules <- newSTRef []
-  return $ Env source eg rules
+runAppM :: Env -> App a -> IO a
+runAppM env app = runReaderT (unApp app) env
+
+instance MonadLogger App where
+  monadLoggerLog loc src level msg = do
+    logger <- asks envLogger
+    liftIO $ logger loc src level (toLogStr msg)
+
+createEnv :: Opts -> LogFunc -> IO Env
+createEnv opts logger = do
+  eg <- stToIO $ createEGraph
+  rules <- newIORef []
+  return $
+    Env
+      { envOpts = opts,
+        envEgraph = eg,
+        envRules = rules,
+        envLogger = logger
+      }
 
 expr2ENode :: EGraph s -> Expr -> ST s EClassId
 expr2ENode eg (OpExpr op args) = do
@@ -38,12 +69,36 @@ expr2Pattern (ConsExpr cons) = PCons cons
 expr2RwRule :: Expr -> Expr -> RwRule
 expr2RwRule lhs rhs = RwRule (expr2Pattern lhs) (expr2Pattern rhs)
 
-runEgraph :: Ast -> EnvMonad s ()
-runEgraph (ARewrite lhs rhs) (Env {..}) = do
-  let rule = expr2RwRule lhs rhs
-  rules <- readSTRef rulesRef
-  writeSTRef rulesRef $ rule : rules
-runEgraph (AExpr expr) (Env {..}) = do
-  eid <- expr2ENode egraph expr
-  rules <- readSTRef rulesRef
-  saturate egraph rules eid
+addRule :: RwRule -> App ()
+addRule newRule = do
+  rulesRef' <- asks envRules
+  void . liftIO $ atomicModifyIORef'_ rulesRef' $ (:) newRule
+  $logDebug $ "Added new rewrite rule: " <> T.pack (show newRule)
+
+getRules :: App [RwRule]
+getRules = do
+  rulesRef' <- asks envRules
+  rules <- liftIO $ readIORef rulesRef'
+  $logDebug $ "Current rewrite rules: " <> T.pack (show rules)
+  return rules
+
+addExpr :: Expr -> App EClassId
+addExpr expr = runEGraphOp $ flip expr2ENode expr
+
+runSaturation :: [RwRule] -> EClassId -> App ()
+runSaturation rules eid = runEGraphOp (\eg -> saturate eg rules eid)
+
+runEGraphOp :: (EGraph RealWorld -> ST RealWorld a) -> App a
+runEGraphOp stAction = do
+  theEGraph <- asks envEgraph
+  liftIO . stToIO $ stAction theEGraph
+
+runExpr :: Ast -> App ()
+runExpr (ARewrite lhs rhs) = do
+  addRule (expr2RwRule lhs rhs)
+runExpr (AExpr expr) = do
+  eid <- addExpr expr
+  rules <- getRules
+  let showEGraph = fmap T.pack . liftIO . stToIO . visualizeEGraph
+  $logDebug =<< showEGraph =<< asks envEgraph
+  runSaturation rules eid
