@@ -4,7 +4,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Runtime (createEnv, runExpr, Env (..), App (..), runAppM) where
+module Runtime (createEnv, runAst, runAsts, Env (..), App (..), runAppM) where
 
 import Cli
 import Control.Monad (void)
@@ -93,12 +93,15 @@ runEGraphOp stAction = do
   theEGraph <- asks envEgraph
   liftIO . stToIO $ stAction theEGraph
 
-runExpr :: Ast -> App ()
-runExpr (ARewrite lhs rhs) = do
+runAst :: Ast -> App ()
+runAst (ARewrite lhs rhs) = do
   addRule (expr2RwRule lhs rhs)
-runExpr (AExpr expr) = do
+runAst (AExpr expr) = do
   eid <- addExpr expr
   rules <- getRules
   let showEGraph = fmap T.pack . liftIO . stToIO . visualizeEGraph
   $logDebug =<< showEGraph =<< asks envEgraph
   runSaturation rules eid
+
+runAsts :: [Ast] -> App ()
+runAsts = mapM_ runAst

@@ -106,11 +106,14 @@ pRewrite = do
   rhs <- pExpr
   return $ ARewrite lhs rhs
 
-pAst :: Parser (Maybe Ast)
-pAst = choice [Just <$> pRewrite, Just . AExpr <$> pExpr, sc $> Nothing] <* eof
+pAst :: Parser Ast
+pAst = choice [pRewrite, AExpr <$> pExpr]
 
-parseAst :: String -> String -> Either String (Maybe Ast)
+pAsts :: Parser [Ast]
+pAsts = sc >> many (pAst <* sc) <* eof
+
+parseAst :: String -> String -> Either String [Ast]
 parseAst source input =
-  case runParser pAst source (T.pack input) of
+  case runParser pAsts source (T.pack input) of
     Left err -> Left $ errorBundlePretty err
     Right ast -> Right ast

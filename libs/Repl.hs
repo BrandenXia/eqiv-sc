@@ -18,11 +18,8 @@ loop = do
       let input = fromJust maybeInput
       case parseAst "repl" input of
         Left err -> outputStrLn err
-        Right (Just ast) -> do
-          lift $ runExpr ast
-          return ()
-        Right Nothing -> return ()
+        Right asts -> lift $ runAsts asts
 
 repl :: App ()
 repl = do
-  runInputT settings $ withInterrupt $ handleInterrupt (return ()) loop
+  runInputT settings $ withInterrupt $ handleInterrupt (pure ()) loop
