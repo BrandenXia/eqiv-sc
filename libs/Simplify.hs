@@ -10,7 +10,7 @@ import Control.Monad.Trans.Maybe
 import Data.Foldable (Foldable (toList))
 import Data.Functor
 import qualified Data.HashTable.Class as H
-import Data.Maybe (catMaybes, listToMaybe)
+import Data.Maybe (listToMaybe, mapMaybe)
 import Egraph
 import Utils (findMaybeM)
 
@@ -35,26 +35,25 @@ data RwRule = RwRule
 
 matchPattern :: EGraph s -> Pattern -> EClassId -> ST s (Maybe [(Symbol, EClassId)])
 matchPattern _ (PVar v) cid = return $ Just [(v, cid)]
-matchPattern eg@(EGraph {..}) pattern cid = runMaybeT $ do
+matchPattern EGraph {..} (PCons n) cid = runMaybeT $ do
   ns <- MaybeT $ H.lookup classes cid
-  case pattern of
-    PCons n -> do
-      guard $ any (matchCons n) ns
-      return []
-      where
-        matchCons cons (ConsNode m) = m == cons
-        matchCons _ _ = False
-    POp op args ->
-      let matchOp (OpNode op' args')
-            | op /= op' || length args /= length args' = return Nothing
-            | otherwise = do
-                matches <- zipWithM (matchPattern eg) args args'
-                return $ concat <$> sequence matches
-          matchOp _ = return Nothing
-       in MaybeT $ findMaybeM matchOp ns
+  guard $ any (matchCons n) ns
+  return []
+  where
+    matchCons cons (ConsNode m) = m == cons
+    matchCons _ _ = False
+matchPattern eg@(EGraph {..}) (POp op args) cid = runMaybeT $ do
+  ns <- MaybeT $ H.lookup classes cid
+  let matchOp (OpNode op' args')
+        | op /= op' || length args /= length args' = return Nothing
+        | otherwise = do
+            matches <- zipWithM (matchPattern eg) args args'
+            return $ concat <$> sequence matches
+      matchOp _ = return Nothing
+   in MaybeT $ findMaybeM matchOp ns
 
 instantiatePattern :: EGraph s -> Pattern -> [(Symbol, EClassId)] -> ST s EClassId
-instantiatePattern eg pattern subs = case pattern of
+instantiatePattern eg patt subs = case patt of
   PVar v -> case lookup v subs of
     Just cid -> return cid
     Nothing -> error $ "Unbound variable: " ++ v
@@ -97,16 +96,15 @@ compute eg@(EGraph {..}) cid = runMaybeT $ do
   where
     getConsNode (ConsNode n) = Just n
     getConsNode _ = Nothing
-    g1 = listToMaybe . catMaybes . map getConsNode . toList
-    computeNode (OpNode op args) =
-      case lookup op builtinOpsLookup
-        <&> \(len, f) ->
-          if length args /= len
-            then pure Nothing
-            else
-              let transform = join . fmap f . traverse g1
-                  evaluatedArgs = sequence <$> mapM (findEClass eg >=> H.lookup classes) args
-               in fmap (>>= transform) evaluatedArgs of
-        Just res -> res
-        Nothing -> return Nothing
+    g1 = listToMaybe . mapMaybe getConsNode . toList
+    computeNode (OpNode op args) = case lookup op builtinOpsLookup
+      <&> \(len, f) ->
+        if length args /= len
+          then return Nothing
+          else
+            let transform = f <=< traverse g1
+                evaluatedArgs = sequence <$> mapM (findEClass eg >=> H.lookup classes) args
+             in fmap (>>= transform) evaluatedArgs of
+      Just res -> res
+      Nothing -> return Nothing
     computeNode _ = return Nothing

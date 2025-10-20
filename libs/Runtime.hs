@@ -3,6 +3,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module Runtime (createEnv, runAst, runAsts, Env (..), App (..), runAppM) where
 
@@ -35,12 +36,12 @@ newtype App a = App {unApp :: ReaderT Env IO a}
   deriving newtype (MonadThrow, MonadCatch, MonadMask)
 
 runAppM :: Env -> App a -> IO a
-runAppM env app = runReaderT (unApp app) env
+runAppM env (unApp -> app) = runReaderT app env
 
 instance MonadLogger App where
-  monadLoggerLog loc src level msg = do
+  monadLoggerLog loc src level (toLogStr -> msg) = do
     logger <- asks envLogger
-    liftIO $ logger loc src level (toLogStr msg)
+    liftIO $ logger loc src level msg
 
 createEnv :: Opts -> LogFunc -> IO Env
 createEnv opts logger = do
@@ -67,7 +68,7 @@ expr2Pattern (VarExpr sym) = PVar sym
 expr2Pattern (ConsExpr cons) = PCons cons
 
 expr2RwRule :: Expr -> Expr -> RwRule
-expr2RwRule lhs rhs = RwRule (expr2Pattern lhs) (expr2Pattern rhs)
+expr2RwRule (expr2Pattern -> lhs) (expr2Pattern -> rhs) = RwRule lhs rhs
 
 addRule :: RwRule -> App ()
 addRule newRule = do
@@ -83,7 +84,7 @@ getRules = do
   return rules
 
 addExpr :: Expr -> App EClassId
-addExpr expr = runEGraphOp $ flip expr2ENode expr
+addExpr = runEGraphOp . flip expr2ENode
 
 runSaturation :: [RwRule] -> EClassId -> App ()
 runSaturation rules eid = runEGraphOp (\eg -> saturate eg rules eid)

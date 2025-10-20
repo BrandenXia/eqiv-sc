@@ -9,7 +9,6 @@ import Simplify
 saturate :: EGraph s -> [RwRule] -> EClassId -> ST s ()
 saturate eg rules eid = do
   bfs [eid] Set.empty
-  return ()
   where
     bfs [] _ = return ()
     bfs (x : xs) visited = do

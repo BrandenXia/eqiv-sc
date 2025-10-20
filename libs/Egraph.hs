@@ -105,28 +105,26 @@ createEGraph = do
   EGraph cls m <$> createUF
 
 addENode :: EGraph s -> ENode -> ST s EClassId
-addENode EGraph {..} node =
-  case node of
-    OpNode op args -> do
-      args' <- mapM (ufFindSafe uf) args
-      let node' = OpNode op args'
-      cid <- H.lookup memo node'
-      case cid of
-        Just c -> return c
-        Nothing -> do
-          newId <- ufAdd uf
-          H.insert memo node' newId
-          H.insert classes newId (Set.singleton node')
-          return newId
-    _ -> do
-      cid <- H.lookup memo node
-      case cid of
-        Just c -> return c
-        Nothing -> do
-          newId <- ufAdd uf
-          H.insert memo node newId
-          H.insert classes newId (Set.singleton node)
-          return newId
+addENode EGraph {..} (OpNode op args) = do
+  args' <- mapM (ufFindSafe uf) args
+  let node = OpNode op args'
+  cid <- H.lookup memo node
+  case cid of
+    Just c -> return c
+    Nothing -> do
+      newId <- ufAdd uf
+      H.insert memo node newId
+      H.insert classes newId (Set.singleton node)
+      return newId
+addENode EGraph {..} node = do
+  cid <- H.lookup memo node
+  case cid of
+    Just c -> return c
+    Nothing -> do
+      newId <- ufAdd uf
+      H.insert memo node newId
+      H.insert classes newId (Set.singleton node)
+      return newId
 
 unionENodes :: EGraph s -> EClassId -> EClassId -> ST s EClassId
 unionENodes EGraph {..} id1 id2 = do

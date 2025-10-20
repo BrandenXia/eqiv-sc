@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module Parser (Expr (..), Ast (..), parseAst) where
 
@@ -112,7 +113,7 @@ pAsts :: Parser [Ast]
 pAsts = sc >> many (pAst <* sc) <* eof
 
 parseAst :: String -> String -> Either String [Ast]
-parseAst source input =
-  case runParser pAsts source (T.pack input) of
+parseAst source (T.pack -> input) =
+  case runParser pAsts source input of
     Left err -> Left $ errorBundlePretty err
     Right ast -> Right ast
