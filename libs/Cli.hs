@@ -2,7 +2,7 @@ module Cli (runCli, Cmd (..), Opts (..), Cli (..)) where
 
 import Options.Applicative
 
-data RunFileOpts = RunFileOpts
+newtype RunFileOpts = RunFileOpts
   { filePath :: FilePath
   }
   deriving (Eq, Show)
@@ -12,7 +12,7 @@ data Cmd
   | RunFile RunFileOpts
   deriving (Eq, Show)
 
-data Opts = Opts
+newtype Opts = Opts
   { verbose :: Bool
   }
   deriving (Eq, Show)
@@ -29,7 +29,7 @@ runFileDesc = "Run commands from a specified file"
 
 replParser, runFileParser, cmdParser :: Parser Cmd
 replParser = pure Repl
-runFileParser = RunFile <$> RunFileOpts <$> strArgument (metavar "FILE" <> help "Path to the input file")
+runFileParser = RunFile . RunFileOpts <$> strArgument (metavar "FILE" <> help "Path to the input file")
 cmdParser =
   hsubparser
     ( command "repl" (info replParser (progDesc replDesc))

@@ -2,7 +2,7 @@ module Repl (repl) where
 
 import Control.Monad (forever, when)
 import Control.Monad.Trans.Class (MonadTrans (lift))
-import Data.Maybe (fromJust)
+import Data.Maybe (fromJust, isJust)
 import Parser
 import Runtime
 import System.Console.Haskeline
@@ -14,7 +14,7 @@ loop :: InputT App ()
 loop = do
   forever $ do
     maybeInput <- getInputLine "> "
-    when (maybeInput /= Nothing) $ do
+    when (isJust maybeInput) $ do
       let input = fromJust maybeInput
       case parseAst "repl" input of
         Left err -> outputStrLn err

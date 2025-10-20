@@ -44,7 +44,7 @@ instance MonadLogger App where
 
 createEnv :: Opts -> LogFunc -> IO Env
 createEnv opts logger = do
-  eg <- stToIO $ createEGraph
+  eg <- stToIO createEGraph
   rules <- newIORef []
   return $
     Env

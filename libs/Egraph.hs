@@ -20,7 +20,8 @@ import Control.Monad.ST
 import qualified Data.HashTable.Class as H
 import qualified Data.HashTable.ST.Basic as BSTH
 import Data.Hashable (Hashable)
-import Data.List (intersperse)
+import Data.List (intercalate)
+import Data.Maybe (fromMaybe)
 import qualified Data.Set as Set
 import GHC.Generics (Generic)
 import qualified Utils.MVec as MVec
@@ -40,28 +41,28 @@ createUF = do
   r <- MVec.new 64
   return $ UnionFind p r
 
-uf_find :: UnionFind s -> EClassId -> ST s EClassId
-uf_find uf@(UnionFind p _) x = do
+ufFind :: UnionFind s -> EClassId -> ST s EClassId
+ufFind uf@(UnionFind p _) x = do
   px <- MVec.read p x
   if px == x
     then return x
     else do
-      root <- uf_find uf px
+      root <- ufFind uf px
       MVec.write p x root
       return root
 
-uf_find_safe :: UnionFind s -> EClassId -> ST s EClassId
-uf_find_safe uf@(UnionFind p _) x = do
+ufFindSafe :: UnionFind s -> EClassId -> ST s EClassId
+ufFindSafe uf@(UnionFind p _) x = do
   len <- MVec.length p
   if x < 0 || x >= len
     then error "uf_find_safe: EClassId out of bounds"
-    else uf_find uf x
+    else ufFind uf x
 
-uf_union :: UnionFind s -> EClassId -> EClassId -> ST s EClassId
-uf_union uf@(UnionFind {..}) x y = do
-  px <- uf_find uf x
-  py <- uf_find uf y
-  if (px == py)
+ufUnion :: UnionFind s -> EClassId -> EClassId -> ST s EClassId
+ufUnion uf@(UnionFind {..}) x y = do
+  px <- ufFind uf x
+  py <- ufFind uf y
+  if px == py
     then return px
     else do
       rx <- MVec.read ranks px
@@ -76,8 +77,8 @@ uf_union uf@(UnionFind {..}) x y = do
           MVec.write ranks px (rx + ry)
           return px
 
-uf_add :: UnionFind s -> ST s EClassId
-uf_add UnionFind {..} = do
+ufAdd :: UnionFind s -> ST s EClassId
+ufAdd UnionFind {..} = do
   newId <- MVec.length parents
   MVec.pushBack parents newId
   MVec.pushBack ranks 1
@@ -101,20 +102,19 @@ createEGraph :: ST s (EGraph s)
 createEGraph = do
   cls <- H.new
   m <- H.new
-  u <- createUF
-  return $ EGraph cls m u
+  EGraph cls m <$> createUF
 
 addENode :: EGraph s -> ENode -> ST s EClassId
 addENode EGraph {..} node =
   case node of
     OpNode op args -> do
-      args' <- mapM (uf_find_safe uf) args
+      args' <- mapM (ufFindSafe uf) args
       let node' = OpNode op args'
       cid <- H.lookup memo node'
       case cid of
         Just c -> return c
         Nothing -> do
-          newId <- uf_add uf
+          newId <- ufAdd uf
           H.insert memo node' newId
           H.insert classes newId (Set.singleton node')
           return newId
@@ -123,22 +123,22 @@ addENode EGraph {..} node =
       case cid of
         Just c -> return c
         Nothing -> do
-          newId <- uf_add uf
+          newId <- ufAdd uf
           H.insert memo node newId
           H.insert classes newId (Set.singleton node)
           return newId
 
 unionENodes :: EGraph s -> EClassId -> EClassId -> ST s EClassId
 unionENodes EGraph {..} id1 id2 = do
-  root1 <- uf_find uf id1
-  root2 <- uf_find uf id2
-  if (root1 == root2)
+  root1 <- ufFind uf id1
+  root2 <- ufFind uf id2
+  if root1 == root2
     then return root1
     else do
-      root <- uf_union uf root1 root2
+      root <- ufUnion uf root1 root2
       nodes1 <- H.lookup classes root1
       nodes2 <- H.lookup classes root2
-      let mergedNodes = maybe Set.empty id nodes1 <> maybe Set.empty id nodes2
+      let mergedNodes = fromMaybe Set.empty nodes1 <> fromMaybe Set.empty nodes2
       mapM_ (\node -> H.insert memo node root) mergedNodes
       H.insert classes root mergedNodes
       H.delete classes (if root == root1 then root2 else root1)
@@ -152,22 +152,22 @@ addEquivNode eg node eid = do
   return (root, newEid)
 
 inEGraph :: EGraph s -> ENode -> ST s (Maybe EClassId)
-inEGraph EGraph {..} node = H.lookup memo node
+inEGraph EGraph {..} = H.lookup memo
 
 findEClass :: EGraph s -> EClassId -> ST s EClassId
-findEClass EGraph {..} eid = uf_find_safe uf eid
+findEClass EGraph {..} = ufFindSafe uf
 
 visualizeEGraph :: EGraph s -> ST s String
 visualizeEGraph EGraph {..} = do
   cnodes <- H.toList classes
   nodesStrs <- mapM showCNode cnodes
-  return $ "EGraph {\n  " ++ concat (intersperse "\n  " nodesStrs) ++ "\n}"
+  return $ "EGraph {\n  " ++ intercalate "\n  " nodesStrs ++ "\n}"
   where
     showNode (OpNode op args) = do
-      argsClass <- mapM (uf_find_safe uf) args
-      return $ "OpNode " ++ op ++ " [" ++ concat (intersperse ", " (("C" ++) . show <$> argsClass)) ++ "]"
+      argsClass <- mapM (ufFindSafe uf) args
+      return $ "OpNode " ++ op ++ " [" ++ intercalate ", " (("C" ++) . show <$> argsClass) ++ "]"
     showNode (VarNode v) = return $ "VarNode " ++ v
     showNode (ConsNode n) = return $ "ConsNode " ++ show n
     showCNode (cid, nodes) = do
       snodes <- mapM showNode (Set.toList nodes)
-      return $ "Class" ++ show cid ++ " = {" ++ concat (intersperse ", " snodes) ++ "}"
+      return $ "Class" ++ show cid ++ " = {" ++ intercalate ", " snodes ++ "}"

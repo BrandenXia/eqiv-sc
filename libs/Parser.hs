@@ -103,8 +103,7 @@ pRewrite = do
   void sc
   lhs <- pExpr
   void sc
-  rhs <- pExpr
-  return $ ARewrite lhs rhs
+  ARewrite lhs <$> pExpr
 
 pAst :: Parser Ast
 pAst = choice [pRewrite, AExpr <$> pExpr]
