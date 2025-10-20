@@ -3,7 +3,7 @@
 
 module Repl (repl) where
 
-import Control.Monad (forever, when)
+import Control.Monad (forM_, forever, when)
 import Control.Monad.IO.Class (MonadIO)
 import Control.Monad.Logger
 import Control.Monad.Trans.Class (MonadTrans (lift))
@@ -23,9 +23,10 @@ loop = forever $ do
     let input = fromJust maybeInput
     case parseAst "repl" input of
       Left err -> outputStrLn err
-      Right asts -> lift $ do
-        $logDebug $ "Parsed ASTs from input:" <> T.pack (show asts)
-        runAsts asts
+      Right asts -> do
+        lift . $logDebug $ "Parsed ASTs from input:" <> T.pack (show asts)
+        exprs <- lift $ runAsts asts
+        forM_ exprs (outputStrLn . show)
 
 repl :: App ()
 repl = runInputT settings $ withInterrupt $ handleInterrupt (pure ()) loop

@@ -5,7 +5,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ViewPatterns #-}
 
-module Runtime (createEnv, runAst, runAsts, Env (..), App (..), runAppM) where
+module Runtime (createEnv, runAst, runAsts, Env (..), App (..), runAppM, bestRepr) where
 
 import Cli
 import Control.Monad (void)
@@ -15,6 +15,7 @@ import Control.Monad.Logger
 import Control.Monad.Reader
 import Control.Monad.ST
 import Data.IORef
+import Data.Maybe (catMaybes)
 import qualified Data.Text as T
 import Egraph
 import GHC.IORef (atomicModifyIORef'_)
@@ -89,20 +90,25 @@ addExpr = runEGraphOp . flip expr2ENode
 runSaturation :: [RwRule] -> EClassId -> App ()
 runSaturation rules eid = runEGraphOp (\eg -> saturate eg rules eid)
 
+bestRepr :: EClassId -> App Expr
+bestRepr = runEGraphOp . flip findBestRepr
+
 runEGraphOp :: (EGraph RealWorld -> ST RealWorld a) -> App a
 runEGraphOp stAction = do
   theEGraph <- asks envEgraph
   liftIO . stToIO $ stAction theEGraph
 
-runAst :: Ast -> App ()
+runAst :: Ast -> App (Maybe Expr)
 runAst (ARewrite lhs rhs) = do
   addRule (expr2RwRule lhs rhs)
+  return Nothing
 runAst (AExpr expr) = do
   eid <- addExpr expr
   rules <- getRules
+  runSaturation rules eid
   let showEGraph = fmap T.pack . liftIO . stToIO . visualizeEGraph
   $logDebug =<< showEGraph =<< asks envEgraph
-  runSaturation rules eid
+  Just <$> bestRepr eid
 
-runAsts :: [Ast] -> App ()
-runAsts = mapM_ runAst
+runAsts :: [Ast] -> App [Expr]
+runAsts = fmap catMaybes . mapM runAst
