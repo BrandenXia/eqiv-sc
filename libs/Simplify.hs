@@ -52,24 +52,20 @@ matchPattern eg@(EGraph {..}) (POp op args) cid = runMaybeT $ do
       matchOp _ = return Nothing
    in MaybeT $ findMaybeM matchOp ns
 
-instantiatePattern :: EGraph s -> Pattern -> [(Symbol, EClassId)] -> ST s EClassId
-instantiatePattern eg patt subs = case patt of
-  PVar v -> case lookup v subs of
+instantiatePattern :: EGraph s -> [(Symbol, EClassId)] -> Pattern -> ST s EClassId
+instantiatePattern _ subs (PVar v) =
+  case lookup v subs of
     Just cid -> return cid
     Nothing -> error $ "Unbound variable: " ++ v
-  PCons n -> addENode eg (ConsNode n)
-  POp op args -> do
-    argIds <- mapM (\p -> instantiatePattern eg p subs) args
-    addENode eg (OpNode op argIds)
+instantiatePattern eg _ (PCons n) = addENode eg (ConsNode n)
+instantiatePattern eg subs (POp op args) = do
+  argIds <- mapM (instantiatePattern eg subs) args
+  addENode eg (OpNode op argIds)
 
 rewrite :: EGraph s -> RwRule -> EClassId -> ST s (Maybe EClassId)
-rewrite eg (RwRule lhs rhs) eid = do
-  match <- matchPattern eg lhs eid
-  case match of
-    Nothing -> return Nothing
-    Just subs -> do
-      rhsId <- instantiatePattern eg rhs subs
-      return $ Just rhsId
+rewrite eg (RwRule lhs rhs) eid = runMaybeT $ do
+  match <- MaybeT $ matchPattern eg lhs eid
+  lift $ instantiatePattern eg match rhs
 
 builtinOps :: [(Op, Int, [Primitive] -> Maybe Primitive)]
 builtinOps =
